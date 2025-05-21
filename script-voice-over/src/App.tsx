@@ -115,23 +115,26 @@ function Sessao({
   function startRecording() {
     if (takes.length >= 3) return;
     navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      const recorder = new MediaRecorder(stream)
-      setMediaRecorder(recorder)
-      setChunks([])
-      setTempo(0)
-      recorder.start()
-      setGravando(true)
-      timerRef.current = window.setInterval(() => setTempo(t => t + 1), 1000)
-      recorder.ondataavailable = e => setChunks(chs => [...chs, e.data])
+      const recorder = new MediaRecorder(stream);
+      let localChunks: Blob[] = [];
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) {
+          localChunks.push(e.data);
+        }
+      };
       recorder.onstop = () => {
-        if (timerRef.current) clearInterval(timerRef.current)
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        const url = URL.createObjectURL(blob)
-        setTakes(tks => [...tks, { url, blob, duracao: tempo }].slice(0, 3))
-        setChunks([])
-        setTempo(0)
-      }
-    })
+        if (timerRef.current) clearInterval(timerRef.current);
+        const blob = new Blob(localChunks, { type: 'audio/webm' });
+        const url = URL.createObjectURL(blob);
+        setTakes(tks => [...tks, { url, blob, duracao: tempo }].slice(0, 3));
+        setTempo(0);
+      };
+      setMediaRecorder(recorder);
+      setGravando(true);
+      setTempo(0);
+      recorder.start();
+      timerRef.current = window.setInterval(() => setTempo(t => t + 1), 1000);
+    });
   }
 
   async function saveTakeToDisk(blob: Blob, takeIdx: number) {
@@ -141,8 +144,10 @@ function Sessao({
   }
 
   function stopRecording() {
-    mediaRecorder?.stop()
-    setGravando(false)
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+      setGravando(false);
+    }
   }
 
   useEffect(() => {
