@@ -2,11 +2,100 @@ import React, { useState, useRef, useEffect } from 'react'
 import './App.css'
 import WaveSurfer from 'wavesurfer.js'
 
-function Header() {
+// Modal de configurações de microfone
+function MicrophoneSettingsModal({
+  open,
+  onClose,
+  settings,
+  setSettings,
+  devices,
+  restoreDefaults,
+}: {
+  open: boolean
+  onClose: () => void
+  settings: MicrophoneSettings
+  setSettings: (s: MicrophoneSettings) => void
+  devices: MediaDeviceInfo[]
+  restoreDefaults: () => void
+}) {
+  if (!open) return null
+  return (
+    <div
+      style={{position:'fixed',top:0,left:0,width:'100vw',height:'100vh',background:'rgba(0,0,0,0.5)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center'}}
+      onClick={onClose}
+    >
+      <div
+        style={{background:'#23232b',padding:32,borderRadius:16,minWidth:320,maxWidth:400,color:'#fff',boxShadow:'0 4px 32px #0008',position:'relative'}}
+        onClick={e => e.stopPropagation()}
+      >
+        <button onClick={onClose} style={{position:'absolute',top:12,right:16,fontSize:22,background:'none',border:'none',color:'#fff',cursor:'pointer'}}>✖</button>
+        <h2 style={{marginBottom:24,fontSize:22}}>Configurações do Microfone</h2>
+        <div style={{marginBottom:18}}>
+          <label>Dispositivo:
+            <select
+              style={{width:'100%',marginTop:6,padding:8,borderRadius:8,background:'#18181f',color:'#fff',border:'1px solid #444'}}
+              value={settings.deviceId}
+              onChange={e => setSettings({...settings, deviceId: e.target.value})}
+            >
+              {devices.map(d => (
+                <option key={d.deviceId} value={d.deviceId}>{d.label || `Microfone (${d.deviceId.slice(-4)})`}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div style={{marginBottom:18}}>
+          <label>Volume: {settings.volume}
+            <input type="range" min={0} max={2} step={0.01} value={settings.volume} onChange={e => setSettings({...settings, volume: Number(e.target.value)})} style={{width:'100%'}} />
+          </label>
+        </div>
+        <div style={{marginBottom:18}}>
+          <label>Ganho: {settings.gain}
+            <input type="range" min={0} max={4} step={0.01} value={settings.gain} onChange={e => setSettings({...settings, gain: Number(e.target.value)})} style={{width:'100%'}} />
+          </label>
+        </div>
+        <div style={{marginBottom:18}}>
+          <label>Equalizador:
+            <div style={{display:'flex',gap:8,marginTop:6}}>
+              <span style={{fontSize:13}}>Graves</span>
+              <input type="range" min={-10} max={10} step={1} value={settings.eqLow} onChange={e => setSettings({...settings, eqLow: Number(e.target.value)})} />
+              <span style={{fontSize:13}}>Agudos</span>
+              <input type="range" min={-10} max={10} step={1} value={settings.eqHigh} onChange={e => setSettings({...settings, eqHigh: Number(e.target.value)})} />
+            </div>
+          </label>
+        </div>
+        <div style={{marginBottom:18}}>
+          <label>Pitch: {settings.pitch}
+            <input type="range" min={0.5} max={2} step={0.01} value={settings.pitch} onChange={e => setSettings({...settings, pitch: Number(e.target.value)})} style={{width:'100%'}} />
+          </label>
+        </div>
+        <div style={{marginBottom:18}}>
+          <label style={{display:'flex',alignItems:'center',gap:8}}>
+            <input type="checkbox" checked={settings.monitor} onChange={e => setSettings({...settings, monitor: e.target.checked})} />
+            Retorno de áudio (monitoramento)
+          </label>
+        </div>
+        <button onClick={restoreDefaults} style={{marginTop:12,padding:'8px 18px',borderRadius:8,background:'#444',color:'#fff',border:'none',fontWeight:600,cursor:'pointer'}}>Restaurar padrão</button>
+      </div>
+    </div>
+  )
+}
+
+// Tipos para configurações
+interface MicrophoneSettings {
+  deviceId: string
+  volume: number
+  gain: number
+  eqLow: number
+  eqHigh: number
+  pitch: number
+  monitor: boolean
+}
+
+function Header({onOpenSettings}:{onOpenSettings:()=>void}) {
   return (
     <header className="w-full max-w-3xl mx-auto flex items-center py-12 px-8 mb-8 relative">
       <h1 className="text-6xl font-bold text-left flex-1">Script Voice Over</h1>
-      <button className="absolute right-8 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-200/20 transition-colors" title="Configurações">
+      <button className="absolute right-8 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-200/20 transition-colors" title="Configurações" onClick={onOpenSettings}>
         <span role="img" aria-label="settings" className="text-2xl">⚙️</span>
       </button>
     </header>
@@ -94,6 +183,7 @@ function Sessao({
   descricao,
   onDescricaoChange,
   projetoNome,
+  micSettings,
 }: {
   index: number
   value: string
@@ -101,6 +191,7 @@ function Sessao({
   descricao: string
   onDescricaoChange: (v: string) => void
   projetoNome: string
+  micSettings: MicrophoneSettings
 }) {
   const [aba, setAba] = useState<'script' | 'descricao'>('script')
   // Gravação de áudio
@@ -111,30 +202,86 @@ function Sessao({
   const audioRef = useRef<HTMLAudioElement>(null)
   const timerRef = useRef<number | null>(null)
   const [tempo, setTempo] = useState(0)
+  // Web Audio
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const gainNodeRef = useRef<GainNode | null>(null)
+  const eqLowRef = useRef<BiquadFilterNode | null>(null)
+  const eqHighRef = useRef<BiquadFilterNode | null>(null)
+  const pitchNodeRef = useRef<WaveShaperNode | null>(null)
+  const monitorRef = useRef<MediaStreamAudioDestinationNode | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  // Adicionar ref para pitch no player
+  const pitchRef = useRef<number>(micSettings.pitch)
 
-  function startRecording() {
+  async function startRecording() {
     if (takes.length >= 3) return;
-    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-      const recorder = new MediaRecorder(stream);
-      let localChunks: Blob[] = [];
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) {
-          localChunks.push(e.data);
-        }
-      };
-      recorder.onstop = () => {
-        if (timerRef.current) clearInterval(timerRef.current);
-        const blob = new Blob(localChunks, { type: 'audio/webm' });
-        const url = URL.createObjectURL(blob);
-        setTakes(tks => [...tks, { url, blob, duracao: tempo }].slice(0, 3));
-        setTempo(0);
-      };
-      setMediaRecorder(recorder);
-      setGravando(true);
-      setTempo(0);
-      recorder.start();
-      timerRef.current = window.setInterval(() => setTempo(t => t + 1), 1000);
-    });
+    // Selecionar device
+    const constraints: MediaStreamConstraints = {
+      audio: { deviceId: micSettings.deviceId ? { exact: micSettings.deviceId } : undefined }
+    }
+    const stream = await navigator.mediaDevices.getUserMedia(constraints)
+    streamRef.current = stream
+    // Web Audio pipeline
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+    audioContextRef.current = audioCtx
+    let source = audioCtx.createMediaStreamSource(stream)
+    sourceRef.current = source
+    // Gain
+    const gainNode = audioCtx.createGain()
+    gainNode.gain.value = micSettings.gain * micSettings.volume
+    gainNodeRef.current = gainNode
+    // Equalizador
+    const eqLow = audioCtx.createBiquadFilter()
+    eqLow.type = 'lowshelf'
+    eqLow.frequency.value = 200
+    eqLow.gain.value = micSettings.eqLow
+    eqLowRef.current = eqLow
+    const eqHigh = audioCtx.createBiquadFilter()
+    eqHigh.type = 'highshelf'
+    eqHigh.frequency.value = 3000
+    eqHigh.gain.value = micSettings.eqHigh
+    eqHighRef.current = eqHigh
+    // Pitch (simples: playbackRate não afeta MediaStream, então ignorado na gravação, mas pode ser aplicado no player)
+    // Monitoramento
+    let dest = audioCtx.createMediaStreamDestination()
+    monitorRef.current = dest
+    // Encadeamento: source -> eqLow -> eqHigh -> gain -> dest
+    source.connect(eqLow)
+    eqLow.connect(eqHigh)
+    eqHigh.connect(gainNode)
+    gainNode.connect(dest)
+    // Monitoramento (retorno)
+    if (micSettings.monitor) {
+      const monitorOut = audioCtx.createMediaStreamDestination()
+      gainNode.connect(monitorOut)
+      const audio = new window.Audio()
+      audio.srcObject = monitorOut.stream
+      audio.play()
+    }
+    // Gravar a saída processada
+    const recorder = new MediaRecorder(dest.stream)
+    let localChunks: Blob[] = []
+    recorder.ondataavailable = e => {
+      if (e.data.size > 0) {
+        localChunks.push(e.data)
+      }
+    }
+    recorder.onstop = () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+      const blob = new Blob(localChunks, { type: 'audio/webm' })
+      const url = URL.createObjectURL(blob)
+      setTakes(tks => [...tks, { url, blob, duracao: tempo }].slice(0, 3))
+      setTempo(0)
+      // Cleanup
+      stream.getTracks().forEach(t => t.stop())
+      audioCtx.close()
+    }
+    setMediaRecorder(recorder)
+    setGravando(true)
+    setTempo(0)
+    recorder.start()
+    timerRef.current = window.setInterval(() => setTempo(t => t + 1), 1000)
   }
 
   async function saveTakeToDisk(blob: Blob, takeIdx: number) {
@@ -158,6 +305,10 @@ function Sessao({
     }
     // eslint-disable-next-line
   }, [takes])
+
+  useEffect(() => {
+    pitchRef.current = micSettings.pitch
+  }, [micSettings.pitch])
 
   function deleteTake(idx: number) {
     setTakes(tks => tks.filter((_, i) => i !== idx))
@@ -212,7 +363,13 @@ function Sessao({
             <div key={idx} className="take-box">
               <div className="audio-info">
                 <span className="take-label">Take {String(idx + 1).padStart(2, '0')}</span>
-                <audio ref={audioRef} src={take.url} controls />
+                <audio
+                  ref={el => {
+                    if (el) el.playbackRate = pitchRef.current
+                  }}
+                  src={take.url}
+                  controls
+                />
                 <span className="take-duration">{take.duracao}s</span>
               </div>
               <button className="delete-btn" onClick={() => deleteTake(idx)} title="Deletar">
@@ -229,6 +386,30 @@ function Sessao({
 function App() {
   const [projeto, setProjeto] = useState<string | null>(null)
   const [script, setScript] = useState('')
+  // Modal de configurações
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([])
+  const [micSettings, setMicSettings] = useState<MicrophoneSettings>({
+    deviceId: '',
+    volume: 1,
+    gain: 1,
+    eqLow: 0,
+    eqHigh: 0,
+    pitch: 1,
+    monitor: false,
+  })
+  // Buscar dispositivos de microfone
+  useEffect(() => {
+    navigator.mediaDevices.enumerateDevices().then(devs => {
+      const mics = devs.filter(d => d.kind === 'audioinput')
+      setMicDevices(mics)
+      if (!micSettings.deviceId && mics.length > 0) {
+        setMicSettings(s => ({...s, deviceId: mics[0].deviceId}))
+      }
+    })
+    // eslint-disable-next-line
+  }, [])
+
   // Divisão automática em sessões (parágrafos não vazios)
   const paragrafos = script
     .split(/\n{2,}/)
@@ -258,9 +439,23 @@ function App() {
     setSessoes(s => s.map((sessao, i) => i === idx ? { ...sessao, descricao } : sessao))
   }
 
+  // Função para restaurar configs
+  function restoreMicDefaults() {
+    setMicSettings(s => ({
+      deviceId: micDevices[0]?.deviceId || '',
+      volume: 1,
+      gain: 1,
+      eqLow: 0,
+      eqHigh: 0,
+      pitch: 1,
+      monitor: false,
+    }))
+  }
+
   return (
     <div className="min-h-screen bg-[#222] text-white flex flex-col">
-      <Header />
+      <Header onOpenSettings={()=>setSettingsOpen(true)} />
+      <MicrophoneSettingsModal open={settingsOpen} onClose={()=>setSettingsOpen(false)} settings={micSettings} setSettings={setMicSettings} devices={micDevices} restoreDefaults={restoreMicDefaults} />
       {!projeto ? (
         <div className="flex flex-1 items-center justify-center">
           <div className="centralize-form-google">
@@ -286,6 +481,7 @@ function App() {
                   descricao={sessao.descricao}
                   onDescricaoChange={desc => handleDescricaoChange(idx, desc)}
                   projetoNome={projeto!}
+                  micSettings={micSettings}
                 />
               </div>
             ))}
