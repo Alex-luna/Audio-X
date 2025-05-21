@@ -1,12 +1,13 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import './App.css'
+import WaveSurfer from 'wavesurfer.js'
 
 function Header() {
   return (
-    <header className="flex items-center justify-between py-6 px-8 border-b mb-8">
-      <h1 className="text-2xl font-bold">Script Voice Over</h1>
-      <button className="p-2 rounded-full hover:bg-gray-200 transition-colors" title="Configurações">
-        <span role="img" aria-label="settings">⚙️</span>
+    <header className="w-full max-w-3xl mx-auto flex items-center py-12 px-8 mb-8 relative">
+      <h1 className="text-6xl font-bold text-left flex-1">Script Voice Over</h1>
+      <button className="absolute right-8 top-1/2 -translate-y-1/2 p-2 rounded-full hover:bg-gray-200/20 transition-colors" title="Configurações">
+        <span role="img" aria-label="settings" className="text-2xl">⚙️</span>
       </button>
     </header>
   )
@@ -15,15 +16,15 @@ function Header() {
 function ProjetoForm({ onCreate }: { onCreate: (nome: string) => void }) {
   const [nome, setNome] = useState('')
   return (
-    <form className="flex gap-2 mb-6" onSubmit={e => { e.preventDefault(); if (nome) onCreate(nome) }}>
+    <form className="projeto-form" onSubmit={e => { e.preventDefault(); if (nome) onCreate(nome) }}>
       <input
-        className="border rounded px-3 py-2 flex-1"
+        className="projeto-form-input"
         placeholder="Nome do Projeto"
         value={nome}
         onChange={e => setNome(e.target.value)}
         required
       />
-      <button className="bg-black text-white px-4 py-2 rounded" type="submit">Criar Projeto</button>
+      <button className="projeto-form-btn" type="submit">Criar Projeto</button>
     </form>
   )
 }
@@ -47,18 +48,59 @@ function ScriptPrincipal({ value, onChange }: { value: string, onChange: (v: str
   )
 }
 
+function Waveform({ url }: { url: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!containerRef.current) return
+    const wavesurfer = WaveSurfer.create({
+      container: containerRef.current,
+      waveColor: '#888',
+      progressColor: '#000',
+      height: 40,
+      barWidth: 2,
+      responsive: true,
+    })
+    wavesurfer.load(url)
+    return () => {
+      wavesurfer.destroy()
+    }
+  }, [url])
+  return <div ref={containerRef} className="w-full" />
+}
+
+// Utilitário para salvar arquivo usando File System Access API
+async function salvarArquivo(caminho: string[], blob: Blob) {
+  // Solicita acesso à pasta Downloads na primeira vez
+  // (ou reusa o handle se já existir)
+  if (!window['rootDirHandle']) {
+    // @ts-ignore
+    window['rootDirHandle'] = await window.showDirectoryPicker({ id: 'script-voice-over-root' });
+  }
+  let dirHandle = window['rootDirHandle'];
+  // Cria subpastas conforme o caminho
+  for (let i = 0; i < caminho.length - 1; i++) {
+    dirHandle = await dirHandle.getDirectoryHandle(caminho[i], { create: true });
+  }
+  const fileHandle = await dirHandle.getFileHandle(caminho[caminho.length - 1], { create: true });
+  const writable = await fileHandle.createWritable();
+  await writable.write(blob);
+  await writable.close();
+}
+
 function Sessao({
   index,
   value,
   onChange,
   descricao,
   onDescricaoChange,
+  projetoNome,
 }: {
   index: number
   value: string
   onChange: (v: string) => void
   descricao: string
   onDescricaoChange: (v: string) => void
+  projetoNome: string
 }) {
   const [aba, setAba] = useState<'script' | 'descricao'>('script')
   // Gravação de áudio
@@ -79,7 +121,7 @@ function Sessao({
       setTempo(0)
       recorder.start()
       setGravando(true)
-      timerRef.current = setInterval(() => setTempo(t => t + 1), 1000)
+      timerRef.current = window.setInterval(() => setTempo(t => t + 1), 1000)
       recorder.ondataavailable = e => setChunks(chs => [...chs, e.data])
       recorder.onstop = () => {
         if (timerRef.current) clearInterval(timerRef.current)
@@ -91,25 +133,42 @@ function Sessao({
       }
     })
   }
+
+  async function saveTakeToDisk(blob: Blob, takeIdx: number) {
+    const sessaoPasta = `Sessao_${String(index + 1).padStart(2, '0')}`;
+    const takeNome = `take_${String(takeIdx + 1).padStart(2, '0')}.webm`;
+    await salvarArquivo([projetoNome, sessaoPasta, takeNome], blob);
+  }
+
   function stopRecording() {
     mediaRecorder?.stop()
     setGravando(false)
   }
+
+  useEffect(() => {
+    // Sempre que um novo take for adicionado, salvar no disco
+    if (takes.length > 0) {
+      const ultimo = takes[takes.length - 1];
+      saveTakeToDisk(ultimo.blob, takes.length - 1);
+    }
+    // eslint-disable-next-line
+  }, [takes])
+
   function deleteTake(idx: number) {
     setTakes(tks => tks.filter((_, i) => i !== idx))
   }
 
   return (
-    <div className="bg-gray-100 rounded-lg p-4 mb-6">
-      <div className="flex gap-2 mb-2">
+    <div className="sessao-box">
+      <div className="sessao-tabs">
         <button
-          className={`px-2 py-1 rounded text-sm font-semibold ${aba === 'script' ? 'bg-black text-white' : 'bg-gray-200'}`}
+          className={`tab-btn${aba === 'script' ? ' active' : ''}`}
           onClick={() => setAba('script')}
         >
           Script
         </button>
         <button
-          className={`px-2 py-1 rounded text-sm font-semibold ${aba === 'descricao' ? 'bg-black text-white' : 'bg-gray-200'}`}
+          className={`tab-btn${aba === 'descricao' ? ' active' : ''}`}
           onClick={() => setAba('descricao')}
         >
           Descrição de Cena
@@ -117,13 +176,13 @@ function Sessao({
       </div>
       {aba === 'script' ? (
         <textarea
-          className="w-full min-h-[60px] border rounded p-2 font-mono mb-2"
+          className="script-principal-textarea"
           value={value}
           onChange={e => onChange(e.target.value)}
         />
       ) : (
         <textarea
-          className="w-full min-h-[40px] border rounded p-2 mb-2"
+          className="script-principal-textarea"
           placeholder="Descrição da cena (opcional)"
           value={descricao}
           onChange={e => onDescricaoChange(e.target.value)}
@@ -131,7 +190,7 @@ function Sessao({
       )}
       {/* Gravação de áudio */}
       <div className="flex flex-col gap-2 mt-2">
-        <div className="flex items-center gap-2">
+        <div className="sessao-audio-row">
           <button
             className={`p-2 rounded-full ${gravando ? 'bg-red-600 text-white animate-pulse' : 'bg-black text-white'}`}
             title={gravando ? 'Gravando...' : 'Gravar áudio'}
@@ -145,11 +204,13 @@ function Sessao({
         </div>
         <div className="flex flex-col gap-2">
           {takes.map((take, idx) => (
-            <div key={idx} className="flex items-center gap-2 bg-white rounded p-2 border">
-              <span className="font-mono text-xs">Take {String(idx + 1).padStart(2, '0')}</span>
-              <audio ref={audioRef} src={take.url} controls className="h-8" />
-              <span className="text-xs text-gray-500">{take.duracao}s</span>
-              <button className="text-red-500 ml-2" onClick={() => deleteTake(idx)} title="Deletar">
+            <div key={idx} className="take-box">
+              <div className="audio-info">
+                <span className="take-label">Take {String(idx + 1).padStart(2, '0')}</span>
+                <audio ref={audioRef} src={take.url} controls />
+                <span className="take-duration">{take.duracao}s</span>
+              </div>
+              <button className="delete-btn" onClick={() => deleteTake(idx)} title="Deletar">
                 ✖
               </button>
             </div>
@@ -193,13 +254,17 @@ function App() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-8">
+    <div className="min-h-screen bg-[#222] text-white flex flex-col">
       <Header />
       {!projeto ? (
-        <ProjetoForm onCreate={setProjeto} />
+        <div className="flex flex-1 items-center justify-center">
+          <div className="centralize-form-google">
+            <ProjetoForm onCreate={setProjeto} />
+          </div>
+        </div>
       ) : (
-        <>
-          <div className="mb-4 text-gray-600">Projeto: <b>{projeto}</b></div>
+        <div className="main-project-container">
+          <div className="projeto-title mb-4">Projeto: <b className="text-white">{projeto}</b></div>
           <ScriptPrincipal value={script} onChange={setScript} />
           <div>
             {sessoes.length === 0 && (
@@ -208,17 +273,19 @@ function App() {
               </div>
             )}
             {sessoes.map((sessao, idx) => (
-              <Sessao
-                key={idx}
-                index={idx}
-                value={sessao.texto}
-                onChange={texto => handleSessaoChange(idx, texto)}
-                descricao={sessao.descricao}
-                onDescricaoChange={desc => handleDescricaoChange(idx, desc)}
-              />
+              <div className="sessao-container" key={idx}>
+                <Sessao
+                  index={idx}
+                  value={sessao.texto}
+                  onChange={texto => handleSessaoChange(idx, texto)}
+                  descricao={sessao.descricao}
+                  onDescricaoChange={desc => handleDescricaoChange(idx, desc)}
+                  projetoNome={projeto!}
+                />
+              </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   )

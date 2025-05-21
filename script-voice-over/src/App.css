@@ -40,3 +40,276 @@
 .read-the-docs {
   color: #888;
 }
+
+body, html, #root {
+  min-height: 100vh;
+  background: #222;
+  color: #fff;
+}
+
+header {
+  background: transparent;
+}
+
+/* Centralizar formulário na tela inicial */
+.centralize-form {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Ajustar input e botão do ProjetoForm */
+.projeto-form-input {
+  height: 48px;
+  font-size: 1.25rem;
+  background: #333;
+  color: #fff;
+  border: 1px solid #444;
+  border-radius: 8px 0 0 8px;
+  padding: 0 16px;
+  outline: none;
+}
+.projeto-form-input:focus {
+  border-color: #888;
+}
+.projeto-form-btn {
+  height: 48px;
+  font-size: 1.25rem;
+  border-radius: 0 8px 8px 0;
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 0 32px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.projeto-form-btn:hover {
+  background: #333;
+}
+
+.projeto-form {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  max-width: 500px;
+  margin: 0 auto;
+  box-shadow: 0 2px 16px 0 #0002;
+  background: #222;
+}
+
+.centralize-form-google {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 60px;
+  margin-bottom: 60px;
+}
+
+@media (max-width: 600px) {
+  .projeto-form {
+    max-width: 95vw;
+  }
+}
+
+/* --- MELHORIAS DE UX E LAYOUT --- */
+
+/* Container principal do projeto */
+#root, .main-project-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 2.5rem 1rem 3rem 1rem;
+  text-align: left;
+}
+
+/* Espaçamento entre sessões */
+.sessao-container {
+  margin-bottom: 2.5rem;
+}
+
+/* Caixa de sessão (Sessao) */
+.sessao-box {
+  background: #23232b;
+  border-radius: 16px;
+  padding: 2rem 1.5rem;
+  box-shadow: 0 4px 24px 0 #0004;
+  margin-bottom: 2.5rem;
+  border: 1px solid #333;
+  min-height: 210px;
+}
+
+/* Título do projeto */
+.projeto-title {
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Textareas principais */
+textarea, .script-principal-textarea {
+  width: 100%;
+  min-height: 180px;
+  font-size: 1.15rem;
+  padding: 1.25rem;
+  border-radius: 10px;
+  border: 1.5px solid #444;
+  background: #18181f;
+  color: #fff;
+  margin-bottom: 1.5rem;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.sessao-box textarea, .sessao-box .script-principal-textarea {
+  min-height: 210px;
+}
+.sessao-box textarea[placeholder] {
+  min-height: 60px;
+}
+
+/* Inputs e botões do ProjetoForm */
+.projeto-form-input {
+  height: 56px;
+  font-size: 1.3rem;
+  background: #333;
+  color: #fff;
+  border: 1.5px solid #444;
+  border-radius: 10px 0 0 10px;
+  padding: 0 20px;
+  outline: none;
+}
+.projeto-form-btn {
+  height: 56px;
+  font-size: 1.3rem;
+  border-radius: 0 10px 10px 0;
+  background: #111;
+  color: #fff;
+  border: none;
+  padding: 0 36px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.projeto-form-btn:hover {
+  background: #333;
+}
+
+.projeto-form {
+  display: flex;
+  gap: 0;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto 2.5rem auto;
+  box-shadow: 0 2px 16px 0 #0002;
+  background: #222;
+}
+
+/* Botões de aba (Script/Descrição) */
+.sessao-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.sessao-tabs button {
+  padding: 0.7rem 1.5rem;
+  font-size: 1.1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  border: none;
+  background: #18181f;
+  color: #bbb;
+  transition: background 0.2s, color 0.2s;
+}
+.sessao-tabs button.active {
+  background: #fff;
+  color: #18181f;
+}
+
+/* Melhorar layout dos takes de áudio */
+.take-box {
+  background: #23232b;
+  border-radius: 14px;
+  padding: 1.2rem 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #333;
+  box-shadow: 0 2px 8px 0 #0002;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  position: relative;
+}
+.take-box .audio-info {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  flex: 1;
+}
+.take-box audio {
+  flex: 1;
+  min-width: 180px;
+  max-width: 400px;
+  background: #23232b;
+  border-radius: 8px;
+}
+.take-box .delete-btn {
+  background: #18181f;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  cursor: pointer;
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: background 0.2s;
+}
+.take-box .delete-btn:hover {
+  background: #c00;
+  color: #fff;
+}
+.take-box .take-label {
+  font-family: monospace;
+  font-size: 1rem;
+  color: #fff;
+  margin-right: 1rem;
+}
+.take-box .take-duration {
+  font-size: 0.95rem;
+  color: #aaa;
+  margin-left: 1rem;
+}
+
+/* Melhorar responsividade */
+@media (max-width: 700px) {
+  #root, .main-project-container {
+    max-width: 98vw;
+    padding: 1rem 0.5rem 2rem 0.5rem;
+  }
+  .projeto-form {
+    max-width: 98vw;
+  }
+  .sessao-box {
+    padding: 1.2rem 0.5rem;
+  }
+}
+
+/* Espaçamento entre elementos gerais */
+.mb-4 { margin-bottom: 1.5rem !important; }
+.mb-6 { margin-bottom: 2rem !important; }
+.mb-8 { margin-bottom: 2.5rem !important; }
+
+/* --- FIM MELHORIAS UX --- */
+
+/* Ajustar espaço entre microfone e texto */
+.sessao-audio-row {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+}
