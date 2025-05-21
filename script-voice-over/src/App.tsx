@@ -190,6 +190,20 @@ function gerarCSV(sessoes: { texto: string; descricao: string }[]) {
   return linhas.map(linha => linha.map(campo => '"' + campo.replace(/"/g, '""') + '"').join(',')).join('\r\n')
 }
 
+// Utilitário para gerar CSV de detalhes do projeto
+function gerarDetalhesProjetoCSV({ nome, criadoEm, sessoes, totalTakes, totalSegundos, totalMinutos }: {
+  nome: string,
+  criadoEm: string,
+  sessoes: number,
+  totalTakes: number,
+  totalSegundos: number,
+  totalMinutos: number
+}) {
+  const header = ['Nome do Projeto', 'Criado em', 'Nº de Sessões', 'Nº de Tracks', 'Total (s)', 'Total (min)']
+  const linha = [nome, criadoEm, String(sessoes), String(totalTakes), String(totalSegundos), String(totalMinutos)]
+  return header.join(',') + '\r\n' + linha.map(campo => '"' + campo.replace(/"/g, '""') + '"').join(',')
+}
+
 function Sessao({
   index,
   value,
@@ -198,6 +212,7 @@ function Sessao({
   onDescricaoChange,
   projetoNome,
   micSettings,
+  onTakesChange,
 }: {
   index: number
   value: string
@@ -206,6 +221,7 @@ function Sessao({
   onDescricaoChange: (v: string) => void
   projetoNome: string
   micSettings: MicrophoneSettings
+  onTakesChange?: (duracoes: number[]) => void
 }) {
   const [aba, setAba] = useState<'script' | 'descricao'>('script')
   // Gravação de áudio
@@ -326,6 +342,10 @@ function Sessao({
     if (takes.length > 0) {
       const ultimo = takes[takes.length - 1];
       saveTakeToDisk(ultimo.blob, takes.length - 1);
+    }
+    // Notificar App sobre as durações dos takes
+    if (onTakesChange) {
+      onTakesChange(takes.map(t => t.duracao));
     }
     // eslint-disable-next-line
   }, [takes])
@@ -484,6 +504,51 @@ function App() {
     salvarArquivo([projeto, 'sessoes.csv'], blob);
   }, [sessoes, projeto]);
 
+  // Data de criação do projeto (persistente)
+  const [criadoEm, setCriadoEm] = useState<string | null>(null)
+  useEffect(() => {
+    if (!projeto) return;
+    const key = `criadoEm_${projeto}`;
+    let data = localStorage.getItem(key);
+    if (!data) {
+      data = new Date().toISOString();
+      localStorage.setItem(key, data);
+    }
+    setCriadoEm(data);
+  }, [projeto]);
+
+  // Estado para takes globais
+  const [takesPorSessao, setTakesPorSessao] = useState<{ duracoes: number[] }[]>([])
+
+  // Atualizar takesPorSessao sempre que o número de sessões mudar
+  useEffect(() => {
+    setTakesPorSessao(sessoes.map(() => ({ duracoes: [] })))
+  }, [sessoes.length])
+
+  // Funções para Sessao atualizar takes
+  function handleTakesChange(idx: number, duracoes: number[]) {
+    setTakesPorSessao(tks => tks.map((tk, i) => i === idx ? { duracoes } : tk))
+  }
+
+  // Salvar CSV dos detalhes do projeto sempre que relevante
+  useEffect(() => {
+    if (!projeto || !criadoEm) return;
+    const sessoesCount = sessoes.length;
+    const totalTakes = takesPorSessao.reduce((acc, s) => acc + s.duracoes.length, 0);
+    const totalSegundos = takesPorSessao.reduce((acc, s) => acc + s.duracoes.reduce((a, b) => a + b, 0), 0);
+    const totalMinutos = +(totalSegundos / 60).toFixed(2);
+    const csv = gerarDetalhesProjetoCSV({
+      nome: projeto,
+      criadoEm: new Date(criadoEm).toLocaleString(),
+      sessoes: sessoesCount,
+      totalTakes,
+      totalSegundos,
+      totalMinutos,
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    salvarArquivo([projeto, 'detalhes_projeto.csv'], blob);
+  }, [projeto, criadoEm, sessoes, takesPorSessao]);
+
   return (
     <div className="min-h-screen bg-[#222] text-white flex flex-col">
       <Header onOpenSettings={()=>setSettingsOpen(true)} />
@@ -514,6 +579,7 @@ function App() {
                   onDescricaoChange={desc => handleDescricaoChange(idx, desc)}
                   projetoNome={projeto!}
                   micSettings={micSettings}
+                  onTakesChange={duracoes => handleTakesChange(idx, duracoes)}
                 />
               </div>
             ))}
