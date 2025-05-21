@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import './App.css'
 import WaveSurfer from 'wavesurfer.js'
+import audioBufferToWav from 'audiobuffer-to-wav'
 
 // Modal de configurações de microfone
 function MicrophoneSettingsModal({
@@ -286,8 +287,18 @@ function Sessao({
 
   async function saveTakeToDisk(blob: Blob, takeIdx: number) {
     const sessaoPasta = `Sessao_${String(index + 1).padStart(2, '0')}`;
-    const takeNome = `take_${String(takeIdx + 1).padStart(2, '0')}.webm`;
-    await salvarArquivo([projetoNome, sessaoPasta, takeNome], blob);
+    const takeNome = `take_${String(takeIdx + 1).padStart(2, '0')}.wav`;
+
+    // Converte Blob webm para AudioBuffer
+    const arrayBuffer = await blob.arrayBuffer();
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+    // Converte AudioBuffer para WAV
+    const wavBuffer = audioBufferToWav(audioBuffer);
+    const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+
+    await salvarArquivo([projetoNome, sessaoPasta, takeNome], wavBlob);
   }
 
   function stopRecording() {
