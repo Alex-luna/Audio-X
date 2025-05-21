@@ -177,6 +177,19 @@ async function salvarArquivo(caminho: string[], blob: Blob) {
   await writable.close();
 }
 
+// Utilitário para gerar CSV das sessões
+function gerarCSV(sessoes: { texto: string; descricao: string }[]) {
+  const linhas = [
+    ['Sessão', 'Script', 'Descrição de Cena'],
+    ...sessoes.map((sessao, idx) => [
+      `Sessao_${String(idx + 1).padStart(2, '0')}`,
+      sessao.texto.replace(/\n/g, ' '),
+      sessao.descricao.replace(/\n/g, ' '),
+    ]),
+  ]
+  return linhas.map(linha => linha.map(campo => '"' + campo.replace(/"/g, '""') + '"').join(',')).join('\r\n')
+}
+
 function Sessao({
   index,
   value,
@@ -462,6 +475,14 @@ function App() {
       monitor: false,
     }))
   }
+
+  // Salvar CSV das sessões sempre que houver alteração
+  useEffect(() => {
+    if (!projeto) return;
+    const csv = gerarCSV(sessoes);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    salvarArquivo([projeto, 'sessoes.csv'], blob);
+  }, [sessoes, projeto]);
 
   return (
     <div className="min-h-screen bg-[#222] text-white flex flex-col">
