@@ -312,4 +312,5 @@ textarea, .script-principal-textarea {
   display: flex;
   align-items: center;
   gap: 1.1rem;
+  margin-bottom: 1.5rem;
 }
