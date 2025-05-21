@@ -147,7 +147,6 @@ function Waveform({ url }: { url: string }) {
       progressColor: '#000',
       height: 40,
       barWidth: 2,
-      responsive: true,
     })
     wavesurfer.load(url)
     return () => {
@@ -161,11 +160,12 @@ function Waveform({ url }: { url: string }) {
 async function salvarArquivo(caminho: string[], blob: Blob) {
   // Solicita acesso à pasta Downloads na primeira vez
   // (ou reusa o handle se já existir)
-  if (!window['rootDirHandle']) {
+  const w = window as Window & { rootDirHandle?: any };
+  if (!w.rootDirHandle) {
     // @ts-ignore
-    window['rootDirHandle'] = await window.showDirectoryPicker({ id: 'script-voice-over-root' });
+    w.rootDirHandle = await window.showDirectoryPicker({ id: 'script-voice-over-root' });
   }
-  let dirHandle = window['rootDirHandle'];
+  let dirHandle = w.rootDirHandle;
   // Cria subpastas conforme o caminho
   for (let i = 0; i < caminho.length - 1; i++) {
     dirHandle = await dirHandle.getDirectoryHandle(caminho[i], { create: true });
